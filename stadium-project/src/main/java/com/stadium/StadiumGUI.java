@@ -4,6 +4,7 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.imageio.ImageIO;
 import java.awt.*;
+import java.awt.geom.*;
 import java.io.InputStream;
 import java.time.*;
 import java.util.Date;
@@ -12,240 +13,343 @@ public class StadiumGUI extends JFrame {
 
     private CardLayout cardLayout;
     private JPanel container;
+    
+    // UI Colors ตามเรฟเฟอเรนซ์
+    private final Color DARK_BLUE = new Color(45, 50, 80);    
+    private final Color CORAL_PINK = new Color(214, 123, 123); 
+    private final Color FIELD_BORDER = new Color(230, 230, 230);
 
     public StadiumGUI() {
         setTitle("Stadium Booking System");
-        setSize(1100, 650);
+        setSize(1100, 750);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
 
-        JPanel backgroundPanel = new JPanel() {
+        // --- ส่วน Background Overlay ---
+        JPanel backgroundPanel = new JPanel(new GridBagLayout()) {
             Image bgImage;
             {
                 try {
                     InputStream is = getClass().getResourceAsStream("/images/background.png");
-                    if (is != null) {
-                        bgImage = ImageIO.read(is);
-                    }
+                    if (is != null) bgImage = ImageIO.read(is);
                 } catch (Exception ignored) {}
             }
-
             @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
                 if (bgImage != null) {
                     g.drawImage(bgImage, 0, 0, getWidth(), getHeight(), this);
-                    Graphics2D g2 = (Graphics2D) g;
-                    g2.setColor(new Color(0, 0, 0, 110));
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    g2.setColor(new Color(0, 0, 0, 130)); 
                     g2.fillRect(0, 0, getWidth(), getHeight());
+                    g2.dispose();
                 }
             }
         };
 
-        backgroundPanel.setLayout(new CardLayout());
-        cardLayout = (CardLayout) backgroundPanel.getLayout();
-        container = backgroundPanel;
+        container = new JPanel(new CardLayout());
+        container.setOpaque(false);
+        cardLayout = (CardLayout) container.getLayout();
 
-        container.add(welcomePage(), "WELCOME");
-        container.add(registerPage(), "REGISTER");
-        container.add(loginPage(), "LOGIN");
-        container.add(bookingPage(), "BOOKING");
+        // --- ลำดับหน้าจอ (Flow) ---
+        container.add(welcomePage(), "WELCOME");   // 1. Get Started
+        container.add(registerPage(), "REGISTER"); // 2. Create Account
+        container.add(loginPage(), "LOGIN");       // 3. Login
+        container.add(bookingPage(), "BOOKING");   // 4. Selection
 
+        backgroundPanel.add(container);
         setContentPane(backgroundPanel);
         setVisible(true);
     }
 
-    private JPanel createCard(String title) {
-        JPanel wrapper = new JPanel(new GridBagLayout());
+    // ================= ส่วนจัดการ "ตาแมว" (Password View Toggle) =================
+
+    private JPanel createPasswordFieldWithEye(JPasswordField passField) {
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.setMaximumSize(new Dimension(350, 40));
+        wrapper.setPreferredSize(new Dimension(350, 40));
         wrapper.setOpaque(false);
 
-        JPanel card = new JPanel();
-        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
-        card.setPreferredSize(new Dimension(400, 450)); // ปรับขนาดให้รองรับข้อมูลที่มากขึ้น
-        card.setBackground(new Color(255, 255, 255, 210));
-        card.setBorder(new EmptyBorder(30, 30, 30, 30));
+        styleField(passField);
 
-        JLabel header = new JLabel(title);
-        header.setFont(new Font("Segoe UI", Font.BOLD, 24));
-        header.setAlignmentX(Component.CENTER_ALIGNMENT);
+        JToggleButton eyeBtn = new JToggleButton() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setStroke(new BasicStroke(1.8f));
+                g2.setColor(isSelected() ? CORAL_PINK : Color.LIGHT_GRAY);
 
-        card.add(header);
-        card.add(Box.createVerticalStrut(20));
-        wrapper.add(card);
+                int w = 18, h = 10;
+                int x = (getWidth() - w) / 2;
+                int y = (getHeight() - h) / 2;
+
+                g2.draw(new Arc2D.Float(x, y - 4, w, h + 8, 0, -180, Arc2D.OPEN));
+                g2.draw(new Arc2D.Float(x, y - 4, w, h + 8, 0, 180, Arc2D.OPEN));
+                g2.fillOval(x + w/2 - 2, y + h/2 - 2, 4, 4);
+                if (!isSelected()) g2.drawLine(x - 1, y + h + 1, x + w + 1, y - 1);
+                g2.dispose();
+            }
+        };
+
+        eyeBtn.setPreferredSize(new Dimension(45, 40));
+        eyeBtn.setFocusPainted(false);
+        eyeBtn.setBorderPainted(false);
+        eyeBtn.setContentAreaFilled(false);
+        eyeBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        char defaultChar = passField.getEchoChar();
+        eyeBtn.addActionListener(e -> {
+            passField.setEchoChar(eyeBtn.isSelected() ? (char) 0 : defaultChar);
+            eyeBtn.repaint();
+        });
+
+        passField.setLayout(new BorderLayout());
+        passField.add(eyeBtn, BorderLayout.EAST);
+        wrapper.add(passField, BorderLayout.CENTER);
         return wrapper;
     }
 
-    private void styleButton(JButton b) {
-        b.setBackground(new Color(33, 150, 243));
-        b.setForeground(Color.WHITE);
-        b.setFocusPainted(false);
-        b.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        b.setMaximumSize(new Dimension(250, 45));
-        b.setAlignmentX(Component.CENTER_ALIGNMENT);
-    }
+    // ================= ส่วนประกอบหน้าจอ (Pages) =================
 
+    // หน้าที่ 1: Get Started
     private JPanel welcomePage() {
-        JPanel panel = createCard("Welcome");
-        JPanel card = (JPanel) panel.getComponent(0);
-        JLabel sub = new JLabel("Book your stadium in seconds");
-        sub.setAlignmentX(Component.CENTER_ALIGNMENT);
-        JButton start = new JButton("Get Started");
-        styleButton(start);
-        start.addActionListener(e -> cardLayout.show(container, "REGISTER"));
-        card.add(sub);
-        card.add(Box.createVerticalStrut(30));
-        card.add(start);
-        return panel;
+        JPanel form = new JPanel();
+        form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
+        form.setOpaque(false);
+        
+        JButton startBtn = new JButton("Get Started");
+        styleCoralButton(startBtn);
+        startBtn.addActionListener(e -> cardLayout.show(container, "REGISTER"));
+
+        form.add(Box.createVerticalGlue());
+        form.add(startBtn);
+        form.add(Box.createVerticalGlue());
+
+        return createSplitCard("Stadium Hub", "Welcome to the best booking system", form);
     }
 
+    // หน้าที่ 2: Create Account
     private JPanel registerPage() {
-        JPanel panel = createCard("Register");
-        JPanel card = (JPanel) panel.getComponent(0);
-        JTextField user = new JTextField(15);
-        JPasswordField pass = new JPasswordField(15);
-        JButton btn = new JButton("Register Account");
-        styleButton(btn);
+        JPanel form = new JPanel();
+        form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
+        form.setOpaque(false);
 
+        JTextField user = new JTextField();
+        JPasswordField pass = new JPasswordField();
+        styleField(user);
+        JPanel passPanel = createPasswordFieldWithEye(pass); // ใส่ตาแมว
+
+        JButton btn = new JButton("Create Account");
+        styleCoralButton(btn);
         btn.addActionListener(e -> {
-            User newUser = new User(user.getText(), new String(pass.getPassword()));
-            UserStorage.saveUser(newUser);
-            JOptionPane.showMessageDialog(this, "Registration Successful!");
-            cardLayout.show(container, "LOGIN");
+            String u = user.getText().trim();
+            String p = new String(pass.getPassword()).trim();
+            if (u.isEmpty() || p.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Fields cannot be empty!");
+            } else {
+                UserStorage.saveUser(new User(u, p));
+                JOptionPane.showMessageDialog(this, "Registered successfully!");
+                cardLayout.show(container, "LOGIN");
+            }
         });
 
-        card.add(new JLabel("Username:"));
-        card.add(user);
-        card.add(Box.createVerticalStrut(10));
-        card.add(new JLabel("Password:"));
-        card.add(pass);
-        card.add(Box.createVerticalStrut(25));
-        card.add(btn);
-        return panel;
+        form.add(new JLabel("Create Username")); form.add(user);
+        form.add(Box.createVerticalStrut(15));
+        form.add(new JLabel("Create Password")); form.add(passPanel);
+        form.add(Box.createVerticalStrut(30));
+        form.add(btn);
+
+        return createSplitCard("Register", "Step 1: Create your identity", form);
     }
 
+    // หน้าที่ 3: Login (พร้อมระบบตรวจสอบข้อมูล)
     private JPanel loginPage() {
-        JPanel panel = createCard("Login");
-        JPanel card = (JPanel) panel.getComponent(0);
-        JTextField user = new JTextField(15);
-        JPasswordField pass = new JPasswordField(15);
-        JButton btn = new JButton("Login");
-        styleButton(btn);
+        JPanel form = new JPanel();
+        form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
+        form.setOpaque(false);
 
+        JTextField user = new JTextField();
+        JPasswordField pass = new JPasswordField();
+        styleField(user);
+        JPanel passPanel = createPasswordFieldWithEye(pass); // ใส่ตาแมว
+
+        JButton btn = new JButton("Login");
+        styleCoralButton(btn);
         btn.addActionListener(e -> {
-            if (UserStorage.validateLogin(user.getText(), new String(pass.getPassword()))) {
+            String u = user.getText().trim();
+            String p = new String(pass.getPassword()).trim();
+            // ตรวจสอบข้อมูลจาก UserStorage
+            if (UserStorage.validateLogin(u, p)) {
                 cardLayout.show(container, "BOOKING");
             } else {
-                JOptionPane.showMessageDialog(this, "Invalid username or password");
+                JOptionPane.showMessageDialog(this, "Login Failed! Incorrect username or password.", "Error", JOptionPane.ERROR_MESSAGE);
             }
         });
 
-        card.add(new JLabel("Username:"));
-        card.add(user);
-        card.add(Box.createVerticalStrut(10));
-        card.add(new JLabel("Password:"));
-        card.add(pass);
-        card.add(Box.createVerticalStrut(25));
-        card.add(btn);
-        return panel;
+        form.add(new JLabel("Username")); form.add(user);
+        form.add(Box.createVerticalStrut(15));
+        form.add(new JLabel("Password")); form.add(passPanel);
+        form.add(Box.createVerticalStrut(30));
+        form.add(btn);
+
+        return createSplitCard("Sign In", "Step 2: Access your account", form);
     }
 
+    // หน้าที่ 4: Selection (เลือกสนาม/วัน/เวลา)
     private JPanel bookingPage() {
-        JPanel panel = createCard("Book Stadium");
-        JPanel card = (JPanel) panel.getComponent(0);
+        JPanel form = new JPanel();
+        form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
+        form.setOpaque(false);
 
-        // รายการกีฬาที่เพิ่มขึ้น
-        String[] sports = {
-            "Football (Outdoor)", "Futsal (Indoor)", "Basketball", 
-            "Badminton", "Tennis", "Volleyball", "Fitness Gym"
-        };
-        JComboBox<String> field = new JComboBox<>(sports);
+        String[] stadiumOptions = {"Football Arena A", "Football Arena B", "Futsal Zone", "Basketball Court", "Badminton Court 1", "Badminton Court 2", "Tennis Court"};
+        JComboBox<String> sports = new JComboBox<>(stadiumOptions);
+        
+        JSpinner dateSpin = new JSpinner(new SpinnerDateModel());
+        dateSpin.setEditor(new JSpinner.DateEditor(dateSpin, "yyyy-MM-dd"));
+        
+        JComboBox<String> startT = new JComboBox<>(generateTime());
+        JComboBox<String> endT = new JComboBox<>(generateTime());
 
-        JSpinner date = new JSpinner(new SpinnerDateModel());
-        date.setEditor(new JSpinner.DateEditor(date, "yyyy-MM-dd"));
+        styleField(sports); styleField(dateSpin); styleField(startT); styleField(endT);
 
-        JComboBox<String> start = new JComboBox<>(generateTime());
-        JComboBox<String> end = new JComboBox<>(generateTime());
-
-        JButton next = new JButton("Confirm Booking");
-        styleButton(next);
-
-        next.addActionListener(e -> {
-            Date d = (Date) date.getValue();
-            LocalDate local = d.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-
-            if (local.isBefore(LocalDate.now())) {
-                JOptionPane.showMessageDialog(this, "Cannot book a date in the past!");
-                return;
-            }
-
-            LocalTime s = LocalTime.parse(start.getSelectedItem().toString());
-            LocalTime en = LocalTime.parse(end.getSelectedItem().toString());
-
-            if (!en.isAfter(s)) {
-                JOptionPane.showMessageDialog(this, "End time must be after start time!");
-                return;
-            }
-
-            // คำนวณราคาเบื้องต้น (ตัวอย่าง 1 ชม. = 1 หน่วยราคา)
-            long hours = java.time.Duration.between(s, en).toHours();
-            Booking booking = new Booking(field.getSelectedItem().toString(), local, s, en);
-            
-            showReceipt(booking);
+        JButton confirmBtn = new JButton("Book & View Receipt");
+        styleCoralButton(confirmBtn);
+        confirmBtn.addActionListener(e -> {
+            LocalDate d = ((Date) dateSpin.getValue()).toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            LocalTime s = LocalTime.parse(startT.getSelectedItem().toString());
+            LocalTime en = LocalTime.parse(endT.getSelectedItem().toString());
+            showReceipt(new Booking(sports.getSelectedItem().toString(), d, s, en));
         });
 
-        // ปรับการจัดวาง Layout เพิ่ม Label นำหน้า
-        card.add(new JLabel("Select Sport:"));
-        card.add(field);
-        card.add(Box.createVerticalStrut(10));
-        card.add(new JLabel("Select Date:"));
-        card.add(date);
-        card.add(Box.createVerticalStrut(10));
+        form.add(new JLabel("Choose Stadium")); form.add(sports);
+        form.add(Box.createVerticalStrut(10));
+        form.add(new JLabel("Choose Date")); form.add(dateSpin);
+        form.add(Box.createVerticalStrut(10));
         
-        JPanel timePanel = new JPanel(new GridLayout(2, 2, 5, 5));
-        timePanel.setOpaque(false);
-        timePanel.add(new JLabel("Start:"));
-        timePanel.add(new JLabel("End:"));
-        timePanel.add(start);
-        timePanel.add(end);
-        
-        card.add(timePanel);
-        card.add(Box.createVerticalStrut(25));
-        card.add(next);
+        JPanel timeGrid = new JPanel(new GridLayout(1, 2, 10, 0));
+        timeGrid.setOpaque(false); timeGrid.add(startT); timeGrid.add(endT);
+        form.add(new JLabel("Select Time (Start - End)"));
+        form.add(timeGrid);
+        form.add(Box.createVerticalStrut(25));
+        form.add(confirmBtn);
 
-        return panel;
+        return createSplitCard("Booking", "Step 3: Pick your field", form);
     }
 
-    private void showReceipt(Booking booking) {
-        JPanel panel = createCard("Booking Receipt");
-        JPanel card = (JPanel) panel.getComponent(0);
+    // หน้าสุดท้าย: Receipt (แสดงรายละเอียดและชำระเงิน)
+    private void showReceipt(Booking b) {
+        JPanel receipt = new JPanel();
+        receipt.setLayout(new BoxLayout(receipt, BoxLayout.Y_AXIS));
+        receipt.setOpaque(false);
 
-        // แสดงรายละเอียดการจอง
-        JLabel info1 = new JLabel("ID: " + booking.getId());
-        JLabel info2 = new JLabel("Sport: " + booking.getField());
-        JLabel info3 = new JLabel("Time: " + booking.getStartTime() + " - " + booking.getEndTime());
-        JLabel info4 = new JLabel("Total Price: " + booking.calculatePrice() + " THB");
+        String text = "<html><body style='width: 250px; text-align: center;'>" +
+                      "<h2>Booking Summary</h2>" +
+                      "<b>Stadium:</b> " + b.getField() + "<br>" +
+                      "<b>Date:</b> " + b.getDate() + "<br>" +
+                      "<b>Time:</b> " + b.getStartTime() + " - " + b.getEndTime() + "<br><br>" +
+                      "<h2 style='color: #D67B7B;'>Total: " + b.calculatePrice() + " THB</h2>" +
+                      "<p>Please proceed with payment at the counter.</p>" +
+                      "</body></html>";
+        
+        JLabel summary = new JLabel(text);
+        summary.setAlignmentX(Component.CENTER_ALIGNMENT);
+        
+        JButton finishBtn = new JButton("Finish & Logout");
+        styleCoralButton(finishBtn);
+        finishBtn.addActionListener(e -> cardLayout.show(container, "WELCOME"));
 
-        for (JLabel l : new JLabel[]{info1, info2, info3, info4}) {
-            l.setAlignmentX(Component.CENTER_ALIGNMENT);
-            l.setFont(new Font("Segoe UI", Font.PLAIN, 16));
-            card.add(l);
-            card.add(Box.createVerticalStrut(10));
-        }
+        receipt.add(summary);
+        receipt.add(Box.createVerticalStrut(20));
+        receipt.add(finishBtn);
 
-        JButton finish = new JButton("Go Back Home");
-        styleButton(finish);
-        finish.addActionListener(e -> cardLayout.show(container, "WELCOME"));
-        card.add(Box.createVerticalStrut(20));
-        card.add(finish);
-
-        container.add(panel, "RECEIPT");
+        container.add(createSplitCard("Receipt", "Final Step: Payment Info", receipt), "RECEIPT");
         cardLayout.show(container, "RECEIPT");
+    }
+
+    // ================= ส่วน Styling และ Helper =================
+
+    private JPanel createSplitCard(String title, String subTitle, JPanel formPanel) {
+        JPanel mainCard = new JPanel(new BorderLayout()) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(Color.WHITE);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 40, 40);
+                g2.dispose();
+            }
+        };
+        mainCard.setPreferredSize(new Dimension(850, 550));
+        mainCard.setOpaque(false);
+
+        JPanel leftPanel = new JPanel(new GridBagLayout()) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(DARK_BLUE);
+                g2.fill(new RoundRectangle2D.Float(0, 0, getWidth() + 50, getHeight(), 40, 40));
+                g2.dispose();
+            }
+        };
+        leftPanel.setPreferredSize(new Dimension(350, 550));
+        leftPanel.setOpaque(false);
+        JLabel logo = new JLabel("STADIUM");
+        logo.setFont(new Font("Segoe UI", Font.BOLD, 42));
+        logo.setForeground(Color.WHITE);
+        leftPanel.add(logo);
+
+        JPanel rightPanel = new JPanel();
+        rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
+        rightPanel.setOpaque(false);
+        rightPanel.setBorder(new EmptyBorder(40, 60, 40, 60));
+
+        JLabel head = new JLabel(title);
+        head.setFont(new Font("Segoe UI", Font.BOLD, 32));
+        head.setAlignmentX(Component.CENTER_ALIGNMENT);
+        JLabel sub = new JLabel(subTitle);
+        sub.setForeground(Color.GRAY);
+        sub.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        rightPanel.add(head); rightPanel.add(sub);
+        rightPanel.add(Box.createVerticalStrut(30));
+        rightPanel.add(formPanel);
+
+        mainCard.add(leftPanel, BorderLayout.WEST);
+        mainCard.add(rightPanel, BorderLayout.CENTER);
+        return mainCard;
+    }
+
+    private void styleField(JComponent c) {
+        c.setMaximumSize(new Dimension(350, 40));
+        c.setPreferredSize(new Dimension(350, 40));
+        c.setBackground(Color.WHITE);
+        c.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(FIELD_BORDER, 2, true),
+            BorderFactory.createEmptyBorder(2, 10, 2, 10)
+        ));
+    }
+
+    private void styleCoralButton(JButton b) {
+        b.setMaximumSize(new Dimension(350, 45));
+        b.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        b.setFocusPainted(false); b.setBorderPainted(false); b.setContentAreaFilled(false);
+        b.setForeground(Color.WHITE); b.setFont(new Font("Segoe UI", Font.BOLD, 15));
+        b.setAlignmentX(Component.CENTER_ALIGNMENT);
+        b.setUI(new javax.swing.plaf.basic.BasicButtonUI() {
+            @Override public void paint(Graphics g, JComponent c) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(CORAL_PINK);
+                g2.fillRoundRect(0, 0, c.getWidth(), c.getHeight(), 25, 25);
+                super.paint(g2, c);
+                g2.dispose();
+            }
+        });
     }
 
     private String[] generateTime() {
         String[] t = new String[15];
-        for (int i = 0; i < 15; i++)
-            t[i] = String.format("%02d:00", 8 + i);
+        for (int i = 0; i < 15; i++) t[i] = String.format("%02d:00", 8 + i);
         return t;
     }
 }
