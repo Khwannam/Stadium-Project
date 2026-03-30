@@ -86,8 +86,6 @@ public class StadiumGUI extends JFrame {
 
         cardLayout = (CardLayout) container.getLayout();
  
-        // เพิ่มหน้าจอทั้งหมดลงใน CardLayout
-
         container.add(welcomePage(), "WELCOME");
 
         container.add(registerPage(), "REGISTER");
@@ -106,8 +104,6 @@ public class StadiumGUI extends JFrame {
 
     }
  
-    // ================= Password Eye Toggle =================
-
     private JPanel createPasswordFieldWithEye(JPasswordField passField) {
 
         JPanel wrapper = new JPanel(new BorderLayout());
@@ -174,8 +170,6 @@ public class StadiumGUI extends JFrame {
 
     }
  
-    // ================= Pages =================
-
     private JPanel welcomePage() {
 
         JPanel form = new JPanel();
@@ -424,8 +418,6 @@ public class StadiumGUI extends JFrame {
 
     }
  
-    // --- หน้าจอสุดท้าย: QR Code และปุ่ม Finish (ดึงกลับมาให้แล้วครับ) ---
-
     private void showReceipt(Booking b) {
 
         JPanel receipt = new JPanel();
@@ -446,7 +438,7 @@ public class StadiumGUI extends JFrame {
 
                       "<h3 style='color: #D67B7B;'>Total: " + b.calculatePrice() + " THB</h3>" +
 
-                      "<p style='font-size: 9px;'>Scan to Pay Now</p></body></html>";
+                      "<p style='font-size: 11px;'>Scan to Pay Now</p></body></html>";
 
         JLabel summary = new JLabel(text);
 
@@ -454,13 +446,11 @@ public class StadiumGUI extends JFrame {
 
         receipt.add(summary);
  
-        // QR Code (250x250)
-
         URL qrUrl = getClass().getResource("/images/qr_payment.png");
 
         if (qrUrl != null) {
 
-            ImageIcon qrIcon = new ImageIcon(new ImageIcon(qrUrl).getImage().getScaledInstance(250, 250, Image.SCALE_SMOOTH));
+            ImageIcon qrIcon = new ImageIcon(new ImageIcon(qrUrl).getImage().getScaledInstance(230, 230, Image.SCALE_SMOOTH));
 
             JLabel qrLabel = new JLabel(qrIcon);
 
@@ -470,21 +460,77 @@ public class StadiumGUI extends JFrame {
 
         }
  
-        receipt.add(Box.createVerticalStrut(15));
+        receipt.add(Box.createVerticalStrut(15)); 
+
+        JButton payBtn = new JButton("I have already paid");
+
+        styleCoralButton(payBtn);
+
+        payBtn.addActionListener(e -> {
+
+            container.add(officialTicketPage(b), "TICKET");
+
+            cardLayout.show(container, "TICKET");
+
+        });
+
+        receipt.add(payBtn);
  
-        JButton finishBtn = new JButton("Finish & Logout");
-
-        styleCoralButton(finishBtn);
-
-        finishBtn.addActionListener(e -> cardLayout.show(container, "WELCOME"));
-
-        receipt.add(finishBtn);
- 
-        // นำหน้า Receipt ใส่เข้าไปใน CardLayout และแสดงผล
-
-        container.add(createSplitCard("Receipt", "Final Step: Payment Info", receipt), "RECEIPT");
+        container.add(createSplitCard("Payment", "Step 4: QR Scan", receipt), "RECEIPT");
 
         cardLayout.show(container, "RECEIPT");
+
+    }
+ 
+    // --- หน้าสุดท้าย: ใบเสร็จทางการสำหรับยืนยัน ---
+
+    private JPanel officialTicketPage(Booking b) {
+
+        JPanel panel = new JPanel();
+
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+
+        panel.setOpaque(false);
+ 
+        String ticketText = "<html><div style='text-align: center; background-color: #ffffff; padding: 25px; border: 2px solid #2D3250;'>" +
+
+                            "<h1 style='color: #2D3250; margin: 0;'>BOOKING TICKET</h1>" +
+
+                            "<p style='color: #D67B7B;'>Payment Successful</p><hr>" +
+
+                            "<table style='margin: auto;'>" +
+
+                            "<tr><td align='left'><b>Customer:</b></td><td align='left'>" + UserStorage.getCurrentUser().getUsername() + "</td></tr>" +
+
+                            "<tr><td align='left'><b>Field:</b></td><td align='left'>" + b.getField() + "</td></tr>" +
+
+                            "<tr><td align='left'><b>Date:</b></td><td align='left'>" + b.getDate() + "</td></tr>" +
+
+                            "<tr><td align='left'><b>Time:</b></td><td align='left' style='color: #D67B7B; font-size: 14px;'><b>" + b.getStartTime() + " - " + b.getEndTime() + "</b></td></tr>" +
+
+                            "</table><br>" +
+
+                            "<p style='font-size: 9px; color: gray;'>Ref ID: " + (int)(Math.random()*900000) + "</p>" +
+
+                            "</div></html>";
+ 
+        JLabel ticketLabel = new JLabel(ticketText);
+
+        ticketLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        panel.add(ticketLabel);
+ 
+        panel.add(Box.createVerticalStrut(30));
+
+        JButton logoutBtn = new JButton("Finish & Logout");
+
+        styleCoralButton(logoutBtn);
+
+        logoutBtn.addActionListener(e -> cardLayout.show(container, "WELCOME"));
+
+        panel.add(logoutBtn);
+ 
+        return createSplitCard("Success!", "Show this ticket to stadium staff", panel);
 
     }
  
