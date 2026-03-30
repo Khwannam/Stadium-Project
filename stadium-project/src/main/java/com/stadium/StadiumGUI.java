@@ -34,7 +34,7 @@ public class StadiumGUI extends JFrame {
 
         setTitle("Stadium Booking System");
 
-        setSize(1100, 800); // ปรับความสูงหน้าต่างหลักเพิ่มขึ้นเล็กน้อย
+        setSize(1100, 800); 
 
         setLocationRelativeTo(null);
 
@@ -86,11 +86,15 @@ public class StadiumGUI extends JFrame {
 
         cardLayout = (CardLayout) container.getLayout();
  
+        // เพิ่มหน้าจอทั้งหมดลงใน CardLayout
+
         container.add(welcomePage(), "WELCOME");
 
         container.add(registerPage(), "REGISTER");
 
         container.add(loginPage(), "LOGIN");
+
+        container.add(forgotPasswordPage(), "FORGOT"); 
 
         container.add(bookingPage(), "BOOKING");
  
@@ -257,7 +261,19 @@ public class StadiumGUI extends JFrame {
         styleField(user);
 
         JPanel passPanel = createPasswordFieldWithEye(pass);
+ 
+        JButton forgotBtn = new JButton("Forgot Password?");
 
+        forgotBtn.setForeground(Color.GRAY);
+
+        forgotBtn.setBorder(null); forgotBtn.setContentAreaFilled(false);
+
+        forgotBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        forgotBtn.setAlignmentX(0.5f);
+
+        forgotBtn.addActionListener(e -> cardLayout.show(container, "FORGOT"));
+ 
         JButton btn = new JButton("Login");
 
         styleCoralButton(btn);
@@ -275,16 +291,78 @@ public class StadiumGUI extends JFrame {
             }
 
         });
-
+ 
         form.add(new JLabel("Username")); form.add(user);
 
         form.add(Box.createVerticalStrut(10));
 
         form.add(new JLabel("Password")); form.add(passPanel);
 
-        form.add(Box.createVerticalStrut(20)); form.add(btn);
+        form.add(Box.createVerticalStrut(5));
+
+        form.add(forgotBtn);
+
+        form.add(Box.createVerticalStrut(15)); form.add(btn);
 
         return createSplitCard("Sign In", "Step 2: Access your account", form);
+
+    }
+ 
+    private JPanel forgotPasswordPage() {
+
+        JPanel form = new JPanel();
+
+        form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
+
+        form.setOpaque(false);
+
+        JTextField user = new JTextField();
+
+        JPasswordField newPass = new JPasswordField();
+
+        styleField(user);
+
+        JPanel passPanel = createPasswordFieldWithEye(newPass);
+ 
+        JButton resetBtn = new JButton("Reset Password & Login");
+
+        styleCoralButton(resetBtn);
+
+        resetBtn.addActionListener(e -> {
+
+            String u = user.getText().trim();
+
+            String p = new String(newPass.getPassword());
+
+            if (!u.isEmpty() && !p.isEmpty()) {
+
+                UserStorage.saveUser(new User(u, p));
+
+                JOptionPane.showMessageDialog(this, "Password Reset Success!");
+
+                cardLayout.show(container, "LOGIN");
+
+            }
+
+        });
+ 
+        JButton cancel = new JButton("Cancel");
+
+        cancel.setAlignmentX(0.5f);
+
+        cancel.addActionListener(e -> cardLayout.show(container, "LOGIN"));
+ 
+        form.add(new JLabel("Confirm Your Username")); form.add(user);
+
+        form.add(Box.createVerticalStrut(10));
+
+        form.add(new JLabel("Set New Password")); form.add(passPanel);
+
+        form.add(Box.createVerticalStrut(20)); form.add(resetBtn);
+
+        form.add(Box.createVerticalStrut(10)); form.add(cancel);
+
+        return createSplitCard("Reset Password", "Create your new credential", form);
 
     }
  
@@ -325,7 +403,7 @@ public class StadiumGUI extends JFrame {
             showReceipt(new Booking(sports.getSelectedItem().toString(), d, s, en));
 
         });
-
+ 
         form.add(new JLabel("Choose Stadium")); form.add(sports);
 
         form.add(Box.createVerticalStrut(10));
@@ -346,6 +424,8 @@ public class StadiumGUI extends JFrame {
 
     }
  
+    // --- หน้าจอสุดท้าย: QR Code และปุ่ม Finish (ดึงกลับมาให้แล้วครับ) ---
+
     private void showReceipt(Booking b) {
 
         JPanel receipt = new JPanel();
@@ -374,7 +454,7 @@ public class StadiumGUI extends JFrame {
 
         receipt.add(summary);
  
-        // --- QR Code Section (ปรับขนาดเป็น 250x250 เพื่อให้ปุ่มไม่ตกขอบ) ---
+        // QR Code (250x250)
 
         URL qrUrl = getClass().getResource("/images/qr_payment.png");
 
@@ -390,7 +470,7 @@ public class StadiumGUI extends JFrame {
 
         }
  
-        receipt.add(Box.createVerticalStrut(15)); // เพิ่มช่องว่างนิดหน่อยก่อนถึงปุ่ม
+        receipt.add(Box.createVerticalStrut(15));
  
         JButton finishBtn = new JButton("Finish & Logout");
 
@@ -400,14 +480,14 @@ public class StadiumGUI extends JFrame {
 
         receipt.add(finishBtn);
  
+        // นำหน้า Receipt ใส่เข้าไปใน CardLayout และแสดงผล
+
         container.add(createSplitCard("Receipt", "Final Step: Payment Info", receipt), "RECEIPT");
 
         cardLayout.show(container, "RECEIPT");
 
     }
  
-    // ================= Styling & Helpers =================
-
     private JPanel createSplitCard(String title, String subTitle, JPanel formPanel) {
 
         JPanel mainCard = new JPanel(new BorderLayout()) {
@@ -426,7 +506,7 @@ public class StadiumGUI extends JFrame {
 
         };
 
-        mainCard.setPreferredSize(new Dimension(850, 650)); // ขยายความสูง Card เป็น 650
+        mainCard.setPreferredSize(new Dimension(850, 650));
 
         mainCard.setOpaque(false);
  
