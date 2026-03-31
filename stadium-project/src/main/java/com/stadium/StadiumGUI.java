@@ -19,6 +19,18 @@ import java.time.*;
 import java.util.Date;
  
 public class StadiumGUI extends JFrame {
+    
+    private String selectedStadiumName = ""; 
+    private JButton lastSelectedCard = null;
+    private String selectedTime = "";
+    private JButton lastSelectedTimeBtn = null;
+    private String startTime = "";
+    private String endTime = "";
+    private JButton firstTimeBtn = null;
+    private JButton secondTimeBtn = null;
+    private JSpinner dateSpinner; // ใช้ JSpinner แทน JComboBox สำหรับปฏิทินจริง
+    private double selectedPricePerHr = 0.0;
+
  
     private CardLayout cardLayout;
 
@@ -171,75 +183,149 @@ public class StadiumGUI extends JFrame {
     }
  
     private JPanel welcomePage() {
-
         JPanel form = new JPanel();
-
         form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
-
         form.setOpaque(false);
 
+        // 1. ส่วนของรูปภาพกราฟิกด้านขวา
+        JLabel imageLabel = new JLabel();
+        imageLabel.setAlignmentX(Component.CENTER_ALIGNMENT); // จัดให้อยู่ตรงกลางแนวตั้ง
+        
+        try {
+            // โหลดรูปภาพ (แนะนำให้ใช้ไฟล์ .png ที่ไม่มีพื้นหลังจะสวยมาก)
+            InputStream is = getClass().getResourceAsStream("/images/welcome_hero.png");
+            if (is != null) {
+                Image img = ImageIO.read(is);
+                // ปรับขนาดรูปให้เหมาะสมกับพื้นที่ขาว (ประมาณ 250-300 px)
+                ImageIcon icon = new ImageIcon(img.getScaledInstance(280, 450, Image.SCALE_SMOOTH));
+                imageLabel.setIcon(icon);
+            } else {
+                // ถ้ายังไม่มีไฟล์รูป ให้แสดงข้อความ Placeholder ไว้ก่อน
+                imageLabel.setText("🏟️"); 
+                imageLabel.setFont(new Font("Segoe UI", Font.PLAIN, 100));
+            }
+        } catch (Exception e) {
+            System.err.println("Could not load welcome image");
+        }
+
+        // 2. ปุ่ม Get Started
         JButton startBtn = new JButton("Get Started");
-
         styleCoralButton(startBtn);
-
         startBtn.addActionListener(e -> cardLayout.show(container, "REGISTER"));
 
-        form.add(Box.createVerticalGlue()); form.add(startBtn); form.add(Box.createVerticalGlue());
+        // 3. การจัดวาง (Layout)
+        form.add(Box.createVerticalGlue());    // ดันเนื้อหาลงมาจากด้านบน
+        form.add(imageLabel);                  // ใส่รูปภาพ
+        form.add(Box.createVerticalStrut(30)); // ระยะห่างระหว่างรูปกับปุ่ม
+        form.add(startBtn);                    // ใส่ปุ่ม
+        form.add(Box.createVerticalGlue());    // ดันเนื้อหาขึ้นมาจากด้านล่าง
 
         return createSplitCard("Stadium Hub", "Welcome to the best booking system", form);
-
     }
  
     private JPanel registerPage() {
-
         JPanel form = new JPanel();
-
         form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
-
         form.setOpaque(false);
 
         JTextField user = new JTextField();
-
         JPasswordField pass = new JPasswordField();
+        JTextField firstName = new JTextField();
+        JTextField lastName = new JTextField();
+        JTextField phone = new JTextField();
+        JTextField email = new JTextField();
+
+        JSpinner birthDate = new JSpinner(new SpinnerDateModel());
+        birthDate.setEditor(new JSpinner.DateEditor(birthDate, "yyyy-MM-dd"));
 
         styleField(user);
+        styleField(firstName);
+        styleField(lastName);
+        styleField(phone);
+        styleField(email);
+        styleField(birthDate);
 
         JPanel passPanel = createPasswordFieldWithEye(pass);
 
         JButton btn = new JButton("Create Account");
-
         styleCoralButton(btn);
 
+        // --- เพิ่มปุ่ม "Already have an account?" ตรงนี้ ---
+        JButton toLoginBtn = new JButton("Already have an account? Login");
+        toLoginBtn.setForeground(Color.GRAY);
+        toLoginBtn.setBorder(null);
+        toLoginBtn.setContentAreaFilled(false);
+        toLoginBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        toLoginBtn.setAlignmentX(0.5f); // จัดกลาง
+        toLoginBtn.addActionListener(e -> cardLayout.show(container, "LOGIN")); 
+        // -------------------------------------------
+
         btn.addActionListener(e -> {
+            String username = user.getText().trim();
+            String password = new String(pass.getPassword());
 
-            if (user.getText().trim().isEmpty() || new String(pass.getPassword()).isEmpty()) {
+            if (username.isEmpty() || password.isEmpty()
+                    || firstName.getText().trim().isEmpty()
+                    || lastName.getText().trim().isEmpty()
+                    || phone.getText().trim().isEmpty()
+                    || email.getText().trim().isEmpty()) {
 
-                JOptionPane.showMessageDialog(this, "Fields cannot be empty!");
-
-            } else {
-
-                UserStorage.saveUser(new User(user.getText().trim(), new String(pass.getPassword())));
-
-                JOptionPane.showMessageDialog(this, "Registered successfully!");
-
-                cardLayout.show(container, "LOGIN");
-
+                JOptionPane.showMessageDialog(this, "กรอกข้อมูลให้ครบ!");
+                return;
             }
 
+            if (UserStorage.userExists(username)) {
+                JOptionPane.showMessageDialog(this, "Username นี้มีคนใช้แล้ว!");
+                return;
+            }
+
+            User newUser = new User(
+                username,
+                password,
+                firstName.getText(),
+                lastName.getText(),
+                phone.getText(),
+                email.getText(),
+                ((java.util.Date) birthDate.getValue()).toInstant()
+                    .atZone(java.time.ZoneId.systemDefault())
+                    .toLocalDate()
+                    .toString()
+            );
+            UserStorage.saveUser(newUser);
+
+            JOptionPane.showMessageDialog(this, "สมัครสำเร็จ!");
+            cardLayout.show(container, "LOGIN");
         });
 
-        form.add(new JLabel("Create Username")); form.add(user);
+        // ===== จัดวาง UI =====
+        form.add(new JLabel("Username")); form.add(user);
+        form.add(Box.createVerticalStrut(5));
 
-        form.add(Box.createVerticalStrut(10));
+        form.add(new JLabel("Password")); form.add(passPanel);
+        form.add(Box.createVerticalStrut(5));
 
-        form.add(new JLabel("Create Password")); form.add(passPanel);
+        // ลดขนาด VerticalStrut ลงนิดหน่อยเพื่อให้ปุ่มใหม่ไม่เบียดขอบล่างเกินไป
+        form.add(new JLabel("First Name")); form.add(firstName);
+        form.add(Box.createVerticalStrut(5));
+        
+        form.add(new JLabel("Last Name")); form.add(lastName); // เพิ่มบรรทัดนี้
+        form.add(Box.createVerticalStrut(5));
 
-        form.add(Box.createVerticalStrut(20)); form.add(btn);
+        form.add(new JLabel("Phone Number")); form.add(phone); // เพิ่มบรรทัดนี้ที่หายไป
+        form.add(Box.createVerticalStrut(5));
+
+        form.add(new JLabel("Email")); form.add(email);
+        form.add(Box.createVerticalStrut(5));
+
+        form.add(new JLabel("Birth Date")); form.add(birthDate);
+        form.add(Box.createVerticalStrut(15));
+
+        form.add(btn);
+        form.add(Box.createVerticalStrut(10)); 
+        form.add(toLoginBtn); // วางปุ่มใหม่ไว้ใต้ปุ่ม Create Account
 
         return createSplitCard("Register", "Step 1: Create your identity", form);
-
     }
- 
     private JPanel loginPage() {
 
         JPanel form = new JPanel();
@@ -360,62 +446,199 @@ public class StadiumGUI extends JFrame {
 
     }
  
+    // --- 1. เมธอดสร้างหน้าจอง (จำกัด 2 ชั่วโมง และปุ่มเวลาครบ) ---
     private JPanel bookingPage() {
+        JPanel mainContent = new JPanel();
+        mainContent.setLayout(new BoxLayout(mainContent, BoxLayout.Y_AXIS));
+        mainContent.setOpaque(false);
+        mainContent.setBorder(new EmptyBorder(10, 10, 20, 10));
 
-        JPanel form = new JPanel();
+        // --- 1. เลือกสนาม ---
+        JLabel labelSport = new JLabel("1. Select Stadium");
+        labelSport.setForeground(Color.WHITE);
+        labelSport.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        mainContent.add(labelSport);
+        mainContent.add(Box.createVerticalStrut(10));
 
-        form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
+        JPanel grid = new JPanel(new GridLayout(0, 3, 10, 10)); 
+        grid.setOpaque(false);
+        grid.add(createStadiumCard("Football A", "800", "/images/football_a.png"));
+        grid.add(createStadiumCard("Football B", "800", "/images/football_b.png"));
+        grid.add(createStadiumCard("Futsal", "500", "/images/futsal.png"));
+        grid.add(createStadiumCard("Basketball", "600", "/images/basketball.png"));
+        grid.add(createStadiumCard("Badminton", "200", "/images/badminton1.png"));
+        grid.add(createStadiumCard("Badminton", "200", "/images/badminton2.png"));
+        grid.add(createStadiumCard("Tennis", "400", "/images/tennis.png"));
+        mainContent.add(grid);
+        mainContent.add(Box.createVerticalStrut(25));
 
-        form.setOpaque(false);
+        // --- 2. เลือกวันที่ ---
+        JLabel labelDate = new JLabel("2. Select Date");
+        labelDate.setForeground(Color.WHITE);
+        labelDate.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        mainContent.add(labelDate);
+        mainContent.add(Box.createVerticalStrut(10));
 
-        String[] options = {"Football Arena A", "Football Arena B", "Futsal Zone", "Basketball Court", "Badminton 1", "Badminton 2", "Tennis Court"};
+        java.util.Date today = new java.util.Date();
+        SpinnerDateModel model = new SpinnerDateModel(today, today, null, java.util.Calendar.DAY_OF_MONTH);
+        dateSpinner = new JSpinner(model);
+        JSpinner.DateEditor editor = new JSpinner.DateEditor(dateSpinner, "dd/MM/yyyy");
+        dateSpinner.setEditor(editor);
+        dateSpinner.setMaximumSize(new Dimension(350, 40));
+        mainContent.add(dateSpinner);
+        mainContent.add(Box.createVerticalStrut(25));
 
-        JComboBox<String> sports = new JComboBox<>(options);
+        // --- 3. เลือกช่วงเวลา ---
+        JLabel labelTime = new JLabel("3. Select Time Range (Max 2 Hours)");
+        labelTime.setForeground(Color.WHITE);
+        labelTime.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        mainContent.add(labelTime);
+        mainContent.add(Box.createVerticalStrut(5));
+        
+        JPanel timePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
+        timePanel.setOpaque(false);
+        String[] slots = {"08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00"};
+        
+        for (String slot : slots) {
+            JButton tBtn = new JButton(slot);
+            styleTimeButton(tBtn);
+            tBtn.addActionListener(e -> {
+                // ถ้ายังไม่ได้เลือกเวลาเริ่ม หรือเลือกครบสองอันแล้ว ให้เริ่มนับใหม่
+                if (startTime.isEmpty() || (!startTime.isEmpty() && !endTime.isEmpty())) {
+                    resetTimeSelection(timePanel); // เรียกใช้ฟังก์ชันล้างสีปุ่ม
+                    startTime = slot;
+                    endTime = ""; 
+                    tBtn.setBackground(CORAL_PINK);
+                } else {
+                    // เลือกเวลาสิ้นสุด
+                    int startH = Integer.parseInt(startTime.split(":")[0]);
+                    int endH = Integer.parseInt(slot.split(":")[0]);
+                    
+                    if (endH <= startH) {
+                        JOptionPane.showMessageDialog(this, "End time must be after start time!");
+                        return;
+                    }
+                    if (endH - startH > 2) {
+                        JOptionPane.showMessageDialog(this, "Maximum 2 hours allowed!");
+                        return;
+                    }
+                    
+                    endTime = slot;
+                    tBtn.setBackground(CORAL_PINK);
+                }
+            });
+            timePanel.add(tBtn);
+        }
+        mainContent.add(timePanel);
+        mainContent.add(Box.createVerticalStrut(30));
 
-        JSpinner dateSpin = new JSpinner(new SpinnerDateModel());
-
-        dateSpin.setEditor(new JSpinner.DateEditor(dateSpin, "yyyy-MM-dd"));
-
-        JComboBox<String> startT = new JComboBox<>(generateTime());
-
-        JComboBox<String> endT = new JComboBox<>(generateTime());
-
-        styleField(sports); styleField(dateSpin); styleField(startT); styleField(endT);
-
-        JButton confirmBtn = new JButton("Book & View Receipt");
-
-        styleCoralButton(confirmBtn);
-
+        // --- 4. ปุ่มยืนยัน (จุดที่แก้ไขราคา) ---
+        JButton confirmBtn = new JButton("Confirm Booking");
+        styleCoralButton(confirmBtn); 
         confirmBtn.addActionListener(e -> {
+            if (selectedStadiumName.isEmpty() || startTime.isEmpty() || endTime.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Please select Stadium and Time Range!");
+                return;
+            }
 
-            LocalDate d = ((Date) dateSpin.getValue()).toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM/yyyy");
+            String finalDate = sdf.format((java.util.Date) dateSpinner.getValue());
 
-            LocalTime s = LocalTime.parse(startT.getSelectedItem().toString());
-
-            LocalTime en = LocalTime.parse(endT.getSelectedItem().toString());
-
-            showReceipt(new Booking(sports.getSelectedItem().toString(), d, s, en));
-
+            int diff = Integer.parseInt(endTime.split(":")[0]) - Integer.parseInt(startTime.split(":")[0]);
+            
+            // แก้ไขตรงนี้: ใช้ selectedPricePerHr ที่เก็บจากการกดเลือกสนาม แทนเลข 800.0
+            Booking b = new Booking(selectedStadiumName, finalDate, startTime, endTime, selectedPricePerHr * diff);
+            showReceipt(b);
         });
- 
-        form.add(new JLabel("Choose Stadium")); form.add(sports);
+        mainContent.add(confirmBtn);
 
-        form.add(Box.createVerticalStrut(10));
+        JScrollPane scrollPane = new JScrollPane(mainContent);
+        scrollPane.setOpaque(false); scrollPane.getViewport().setOpaque(false);
+        scrollPane.setBorder(null);
+        return createSplitCard("Booking", "Custom Session", scrollPane);
+    }
 
-        form.add(new JLabel("Choose Date")); form.add(dateSpin);
+    private JButton createStadiumCard(String name, String price, String imgPath) {
+        JButton cardBtn = new JButton();
+        cardBtn.setLayout(new BorderLayout());
+        cardBtn.setPreferredSize(new Dimension(160, 180));
+        cardBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        cardBtn.setFocusPainted(false);
+        cardBtn.setOpaque(true);
+        cardBtn.setBackground(new Color(30, 35, 50));
+        cardBtn.setBorder(BorderFactory.createLineBorder(new Color(255, 255, 255, 20), 1, true));
 
-        form.add(Box.createVerticalStrut(10));
+        try {
+            InputStream is = getClass().getResourceAsStream(imgPath);
+            if (is != null) {
+                Image img = ImageIO.read(is).getScaledInstance(120, 120, Image.SCALE_SMOOTH);
+                cardBtn.setIcon(new ImageIcon(img));
+            }
+        } catch (Exception ignored) {}
 
-        JPanel timeGrid = new JPanel(new GridLayout(1, 2, 10, 0));
+        cardBtn.setText("<html><center><b style='color:white; font-size:10px;'>" + name + "</b><br>" +
+                       "<span style='color:#D67B7B; font-size:9px;'>" + price + " THB/hr</span></center></html>");
+        cardBtn.setVerticalTextPosition(SwingConstants.BOTTOM);
+        cardBtn.setHorizontalTextPosition(SwingConstants.CENTER);
 
-        timeGrid.setOpaque(false); timeGrid.add(startT); timeGrid.add(endT);
+        cardBtn.addActionListener(e -> {
+            if (lastSelectedCard != null) {
+                lastSelectedCard.setBorder(BorderFactory.createLineBorder(new Color(255, 255, 255, 20), 1, true));
+            }
+            selectedStadiumName = name;
+            
+            // แก้ไขตรงนี้: บันทึกราคาของสนามที่กดเลือกไว้ในตัวแปร
+            this.selectedPricePerHr = Double.parseDouble(price);
 
-        form.add(new JLabel("Select Time")); form.add(timeGrid);
+            cardBtn.setBorder(BorderFactory.createLineBorder(CORAL_PINK, 3, true));
+            lastSelectedCard = cardBtn;
+        });
 
-        form.add(Box.createVerticalStrut(20)); form.add(confirmBtn);
+        return cardBtn;
+    }
 
-        return createSplitCard("Booking", "Step 3: Pick your field", form);
-
+    // --- 3. เมธอดสร้าง SplitCard รองรับ JComponent ---
+    private JPanel createSplitCard(String title, String subTitle, JComponent formPanel) {
+        JPanel mainCard = new JPanel(new BorderLayout()) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(Color.WHITE); g2.fillRoundRect(0, 0, getWidth(), getHeight(), 40, 40);
+                g2.dispose();
+            }
+        };
+        mainCard.setPreferredSize(new Dimension(850, 650));
+        mainCard.setOpaque(false);
+        
+        JPanel leftPanel = new JPanel(new GridBagLayout()) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(DARK_BLUE); g2.fill(new RoundRectangle2D.Float(0, 0, getWidth() + 50, getHeight(), 40, 40));
+                g2.dispose();
+            }
+        };
+        leftPanel.setPreferredSize(new Dimension(350, 650)); 
+        leftPanel.setOpaque(false);
+        JLabel logo = new JLabel("STADIUM");
+        logo.setFont(new Font("Segoe UI", Font.BOLD, 42)); logo.setForeground(Color.WHITE);
+        leftPanel.add(logo);
+        
+        JPanel rightPanel = new JPanel();
+        rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
+        rightPanel.setOpaque(false); 
+        rightPanel.setBorder(new EmptyBorder(20, 40, 20, 40));
+        
+        JLabel head = new JLabel(title); head.setFont(new Font("Segoe UI", Font.BOLD, 30)); head.setAlignmentX(0.5f);
+        JLabel sub = new JLabel(subTitle); sub.setForeground(Color.GRAY); sub.setAlignmentX(0.5f);
+        
+        rightPanel.add(head); rightPanel.add(sub);
+        rightPanel.add(Box.createVerticalStrut(15)); 
+        rightPanel.add(formPanel); 
+        
+        mainCard.add(leftPanel, BorderLayout.WEST);
+        mainCard.add(rightPanel, BorderLayout.CENTER);
+        return mainCard;
     }
  
     private void showReceipt(Booking b) {
@@ -647,6 +870,24 @@ public class StadiumGUI extends JFrame {
         return t;
 
     }
-
+    // 👇 วางตรงนี้เลย
+private void styleTimeButton(JButton b) {
+    b.setPreferredSize(new Dimension(85, 40));
+    b.setBackground(new Color(60, 65, 90));
+    b.setForeground(Color.WHITE);
+    b.setFocusPainted(false);
+    b.setBorder(BorderFactory.createLineBorder(new Color(100, 100, 100), 1, true));
 }
- 
+
+// ฟังก์ชันนี้จะช่วยเปลี่ยนสีปุ่มเวลาทั้งหมดกลับเป็นสีเดิม เพื่อเริ่มเลือกใหม่
+    private void resetTimeSelection(JPanel panel) {
+        startTime = ""; 
+        endTime = "";
+        for (Component c : panel.getComponents()) {
+            if (c instanceof JButton) {
+                // เปลี่ยนกลับเป็นสีพื้นฐานที่คุณใช้ใน styleTimeButton (ปกติคือสีน้ำเงินเข้ม)
+                c.setBackground(new Color(60, 65, 90)); 
+            }
+        }
+    }
+}
